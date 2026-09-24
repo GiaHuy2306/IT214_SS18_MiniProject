@@ -1,0 +1,701 @@
+{
+	"info": {
+		"_postman_id": "a9b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"name": "RikkeiBank API - Microservices Ecosystem",
+		"description": "Complete Postman Collection for RikkeiBank Microservices through Spring Cloud API Gateway (Port 8080).\n\nFeatures Included:\n1. Identity & Security: JWT Auth, Refresh Token (Seamless Session), Force-logout / Revoke Token.\n2. Catalog & Customer: Customer & Staff CRUD, Redis Distributed Caching (Cache-Aside).\n3. Catalog & Accounts: Account Types CRUD, Bank Accounts, Balance Management.\n4. Core Business: Distributed Transaction with SAGA Orchestrator (Happy path & Compensating Rollback), Resilience4j Circuit Breaker.\n5. Event-Driven Notifications: Kafka Consumer / Balance Change Alerts.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "admin_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "teller_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "customer_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refresh_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "last_tx_ref",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Identity & Security (identity-service)",
+			"item": [
+				{
+					"name": "1.1 Login as ADMIN",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.accessToken) {",
+									"    pm.collectionVariables.set('admin_token', jsonData.data.accessToken);",
+									"    console.log('Saved admin_token: ' + jsonData.data.accessToken);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "1.2 Login as TELLER",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.accessToken) {",
+									"    pm.collectionVariables.set('teller_token', jsonData.data.accessToken);",
+									"    console.log('Saved teller_token: ' + jsonData.data.accessToken);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"teller\",\n    \"password\": \"teller123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "1.3 Login as CUSTOMER (Long-lived Session)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.accessToken) {",
+									"    pm.collectionVariables.set('customer_token', jsonData.data.accessToken);",
+									"    pm.collectionVariables.set('refresh_token', jsonData.data.refreshToken);",
+									"    console.log('Saved customer_token and refresh_token');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"customer\",\n    \"password\": \"customer123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "1.4 Refresh Token (Seamless Session Renewal)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.accessToken) {",
+									"    pm.collectionVariables.set('customer_token', jsonData.data.accessToken);",
+									"    console.log('Renewed customer_token successfully');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refreshToken\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/refresh",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "refresh"]
+						}
+					}
+				},
+				{
+					"name": "1.5 Register New Customer Account",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"customer3\",\n    \"password\": \"customer123\",\n    \"email\": \"customer3@rikkeibank.com\",\n    \"role\": \"ROLE_CUSTOMER\",\n    \"customerId\": 3\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "1.6 Force Logout / Revoke Token (ADMIN Only)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"token\": \"{{customer_token}}\",\n    \"username\": \"customer\",\n    \"reason\": \"Security risk detected - forced logout\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/revoke",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "revoke"]
+						}
+					}
+				},
+				{
+					"name": "1.7 Get All Users (ADMIN Only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/users",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "users"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Catalog & Customer (customer-service)",
+			"item": [
+				{
+					"name": "2.1 Get All Customers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/customers",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customers"]
+						}
+					}
+				},
+				{
+					"name": "2.2 Get Customer By ID (Redis Cache-Aside Demo)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/customers/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customers", "1"]
+						}
+					}
+				},
+				{
+					"name": "2.3 Create Customer (ADMIN Only)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"fullName\": \"Vu Van C\",\n    \"identityNumber\": \"001200000003\",\n    \"email\": \"vuvanc@rikkeibank.com\",\n    \"phoneNumber\": \"0934567890\",\n    \"address\": \"789 Nguyen Trai, Thanh Xuan, Hanoi\",\n    \"dateOfBirth\": \"1992-08-25\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/customers",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customers"]
+						}
+					}
+				},
+				{
+					"name": "2.4 Update Customer (ADMIN Only - Cache Put)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"fullName\": \"Nguyen Van A Updated\",\n    \"phoneNumber\": \"0909999888\",\n    \"address\": \"456 Kim Ma, Ba Dinh, Hanoi\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/customers/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customers", "1"]
+						}
+					}
+				},
+				{
+					"name": "2.5 Get All Staff / Tellers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/staff",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "staff"]
+						}
+					}
+				},
+				{
+					"name": "2.6 Create Staff / Teller (ADMIN Only)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"fullName\": \"Pham Thi Teller 2\",\n    \"email\": \"teller2@rikkeibank.com\",\n    \"phoneNumber\": \"0988776655\",\n    \"department\": \"Counter Service\",\n    \"branchCode\": \"DANANG_BRANCH\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/staff",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "staff"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Catalog & Account (account-service)",
+			"item": [
+				{
+					"name": "3.1 Get All Account Types (Catalog)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/account-types",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "account-types"]
+						}
+					}
+				},
+				{
+					"name": "3.2 Create Account Type (ADMIN Only)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"typeCode\": \"SUPER_SAVINGS\",\n    \"typeName\": \"Tiet Kiem Sieu Loi Nhuan\",\n    \"interestRate\": 7.2,\n    \"minBalance\": 5000000,\n    \"description\": \"Lai suat dac biet cho ky han tren 12 thang\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/account-types",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "account-types"]
+						}
+					}
+				},
+				{
+					"name": "3.3 Get All Accounts (ADMIN / TELLER)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teller_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/accounts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "accounts"]
+						}
+					}
+				},
+				{
+					"name": "3.4 Get Account By Number (1001000001)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/accounts/1001000001",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "accounts", "1001000001"]
+						}
+					}
+				},
+				{
+					"name": "3.5 Get Accounts By Customer ID (Customer Privacy)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/accounts/customer/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "accounts", "customer", "1"]
+						}
+					}
+				},
+				{
+					"name": "3.6 Create Account (ADMIN / TELLER)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teller_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customerId\": 1,\n    \"accountTypeId\": 1,\n    \"balance\": 2000000,\n    \"currency\": \"VND\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/accounts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "accounts"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Core Business - SAGA Transfers (transaction-service)",
+			"item": [
+				{
+					"name": "4.1 SAGA Transfer SUCCESS (Happy Path)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.transactionReference) {",
+									"    pm.collectionVariables.set('last_tx_ref', jsonData.data.transactionReference);",
+									"    console.log('Saved last_tx_ref: ' + jsonData.data.transactionReference);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"sourceAccountNumber\": \"1001000001\",\n    \"targetAccountNumber\": \"1001000002\",\n    \"amount\": 500000,\n    \"description\": \"Chuyen tien tieu vat thang 9\",\n    \"simulateFailureAtTarget\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/transactions/transfer",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transactions", "transfer"]
+						}
+					}
+				},
+				{
+					"name": "4.2 SAGA Transfer ROLLBACK (Compensating Demo)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.transactionReference) {",
+									"    pm.collectionVariables.set('last_tx_ref', jsonData.data.transactionReference);",
+									"    console.log('Saved rollback tx_ref: ' + jsonData.data.transactionReference);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"sourceAccountNumber\": \"1001000001\",\n    \"targetAccountNumber\": \"1001000002\",\n    \"amount\": 300000,\n    \"description\": \"Chuyen tien test loi SAGA rollback\",\n    \"simulateFailureAtTarget\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/transactions/transfer",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transactions", "transfer"]
+						}
+					}
+				},
+				{
+					"name": "4.3 View SAGA Audit Step Logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/transactions/saga-logs/{{last_tx_ref}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transactions", "saga-logs", "{{last_tx_ref}}"]
+						}
+					}
+				},
+				{
+					"name": "4.4 TELLER Daily Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teller_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/transactions/daily",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transactions", "daily"]
+						}
+					}
+				},
+				{
+					"name": "4.5 Customer Transaction History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/transactions/my-history",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transactions", "my-history"]
+						}
+					}
+				},
+				{
+					"name": "4.6 Get Transaction By Reference",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/transactions/{{last_tx_ref}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transactions", "{{last_tx_ref}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Event-Driven Notifications (notification-service)",
+			"item": [
+				{
+					"name": "5.1 Get All Balance Notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications"]
+						}
+					}
+				},
+				{
+					"name": "5.2 Get Notifications By Account (1001000001)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/account/1001000001",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "notifications", "account", "1001000001"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

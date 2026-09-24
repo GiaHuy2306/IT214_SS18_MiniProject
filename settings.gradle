@@ -1,0 +1,11 @@
+rootProject.name = 'rikkeibank-parent'
+
+include 'common-dto'
+include 'config-server'
+include 'discovery-server'
+include 'api-gateway'
+include 'identity-service'
+include 'customer-service'
+include 'account-service'
+include 'transaction-service'
+include 'notification-service'
